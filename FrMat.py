@@ -1,4 +1,4 @@
-"""FrMat local desktop data workbench. Run: python data_workbench.py"""
+"""Local desktop data workbench. Run: python data_workbench.py"""
 import io
 import json
 import os
@@ -39,7 +39,7 @@ def data_quality(frame):
         return None
     sample = frame.sample(min(total, QUALITY_SAMPLE_ROWS), random_state=42) if total > QUALITY_SAMPLE_ROWS else frame
     n, cols = sample.shape
-
+    # A blank string (including whitespace-only text) is missing for this estimate.
     def is_blank(value):
         if value is None or value is pd.NA:
             return True
@@ -54,9 +54,9 @@ def data_quality(frame):
 
     missing = sample.apply(lambda column: column.map(is_blank))
     completeness = 100 * (1 - missing.to_numpy().sum() / (n * cols))
+    # Stringify only for the duplicate check so nested JSON values remain checkable.
     duplicates = sample.astype(str).duplicated().sum()
     uniqueness = 100 * (1 - duplicates / n)
-
     numeric_columns = []
     for col in sample.columns:
         nonblank = sample[col].where(~missing[col])
@@ -65,7 +65,6 @@ def data_quality(frame):
         numeric = pd.to_numeric(nonblank, errors="coerce")
         if numeric.notna().sum() / nonblank.notna().sum() >= .8:
             numeric_columns.append(numeric)
-
     outlier_rows = pd.Series(False, index=sample.index)
     evaluated = False
     for numeric in numeric_columns:
@@ -74,9 +73,7 @@ def data_quality(frame):
         if pd.notna(iqr) and iqr > 0:
             evaluated = True
             outlier_rows |= numeric.lt(q1 - 1.5 * iqr) | numeric.gt(q3 + 1.5 * iqr)
-
     outliers = 100 * (1 - outlier_rows.sum() / n) if evaluated else None
-
     text_cells = 0
     hard_to_read = 0
     for col in sample.columns:
@@ -88,27 +85,14 @@ def data_quality(frame):
                 continue
             text_cells += 1
             hard_to_read += bool("\ufffd" in value or len(value) > 300 or any(ord(ch) < 32 and ch not in "\n\r\t" for ch in value))
-
     readability = 100 * (1 - hard_to_read / text_cells) if text_cells else None
-
-    metrics = [
-        ("Complete cells", completeness, 35),
-        ("Unique rows", uniqueness, 20),
-        ("No IQR outliers", outliers, 25),
-        ("Readable text", readability, 20),
-    ]
+    metrics = [("Complete cells", completeness, 35), ("Unique rows", uniqueness, 20),
+               ("No IQR outliers", outliers, 25), ("Readable text", readability, 20)]
     applicable = [(value, weight) for _, value, weight in metrics if value is not None]
     score = sum(value * weight for value, weight in applicable) / sum(weight for _, weight in applicable)
-
-    return {
-        "score": score,
-        "metrics": metrics,
-        "rows": n,
-        "total": total,
-        "duplicates": int(duplicates),
-        "outlier_rows": int(outlier_rows.sum()),
-        "hard_to_read": hard_to_read,
-    }
+    return {"score": score, "metrics": metrics, "rows": n, "total": total,
+            "duplicates": int(duplicates), "outlier_rows": int(outlier_rows.sum()),
+            "hard_to_read": hard_to_read}
 
 
 def unique_columns(frame):
@@ -241,6 +225,7 @@ def read_file(path, parent, pdf_mode="Detected tables", doc_mode="Detected table
             if answer != QMessageBox.StandardButton.Yes:
                 return None
             connection = sqlite3.connect(":memory:")
+            # Prevent dump scripts from attaching databases or writing via VACUUM INTO.
             forbidden = {sqlite3.SQLITE_ATTACH, sqlite3.SQLITE_DETACH, sqlite3.SQLITE_PRAGMA}
             if hasattr(sqlite3, "SQLITE_VACUUM"):
                 forbidden.add(sqlite3.SQLITE_VACUUM)
@@ -262,6 +247,7 @@ def read_docx(path, mode="Detected tables"):
     document = Document(path)
     tables = document.tables
     if tables and mode == "Detected tables":
+        # Word tables are imported as columns; paragraphs remain available for text-only files.
         rows = []
         for number, table in enumerate(tables, 1):
             if not table.rows:
@@ -325,11 +311,48 @@ def apply_conditions(frame, expression):
         mask &= result.fillna(False)
     return frame.loc[mask].reset_index(drop=True)
 
+def sort_key(series):
+    """Use numeric or date order when every populated value fits; otherwise text order."""
+    text = series.astype("string").str.strip()
+    populated = text.notna() & text.ne("").fillna(False)
+    numeric = pd.to_numeric(text.where(populated), errors="coerce")
+    if populated.any() and numeric.notna().sum() == populated.sum():
+        return numeric, "numeric"
+    dates = pd.to_datetime(text.where(populated), errors="coerce")
+    if populated.any() and dates.notna().sum() == populated.sum():
+        return dates, "date"
+    return text.where(populated).str.casefold(), "text"
+
+
+def sort_frame(frame, keys):
+    """Stable multi-column sort with missing/blank values last at each priority."""
+    if not keys:
+        raise ValueError("Choose a column to sort")
+    positions = pd.DataFrame(index=range(len(frame)))
+    for i, (column, _) in enumerate(keys):
+        if column not in frame.columns:
+            raise ValueError(f"Unknown sort column: {column}")
+        positions[f"key_{i}"], _ = sort_key(frame[column].reset_index(drop=True))
+    order = positions.sort_values(
+        by=list(positions.columns), ascending=[ascending for _, ascending in keys],
+        na_position="last", kind="stable",
+    ).index
+    return frame.iloc[order].reset_index(drop=True)
+
+
+def ordered_line_points(frame, x, y):
+    """Sort the plotted points by X without changing dataset order."""
+    x_values, kind = sort_key(frame[x].reset_index(drop=True))
+    points = pd.DataFrame({"x": x_values, "y": pd.to_numeric(frame[y], errors="coerce").reset_index(drop=True)})
+    # One point per X; averaging repeated X values avoids vertical zigzags.
+    points = points.groupby("x", sort=True, dropna=True, as_index=False)["y"].mean()
+    return points["x"], points["y"], kind
+
 
 def chart_eligibility(frame, kind, x, y):
     """Return row-level eligibility for a chart and why each excluded row fails."""
     x_values = frame[x]
-    if kind == 1:
+    if kind == 1:  # Missing categories are plotted as '(missing)'.
         return pd.Series(True, index=frame.index), "Any category, including missing, is usable"
     if kind == 0:
         x_ok = pd.to_numeric(x_values, errors="coerce").notna()
@@ -342,6 +365,7 @@ def chart_eligibility(frame, kind, x, y):
         x_ok = pd.to_numeric(x_values, errors="coerce").notna()
         rule = "Both X and Y must be numeric"
     return x_ok & y_ok, rule
+
 
 
 def preset_result(frame, choice, columns):
@@ -402,7 +426,7 @@ class FrameModel(QAbstractTableModel):
         self.endResetModel()
 
     def set_eligibility(self, eligibility, x, y):
-        self.eligibility = eligibility.head(PREVIEW_ROWS) if eligibility is not None else None
+        self.eligibility = eligibility.head(PREVIEW_ROWS)
         self.x_column, self.y_column = x, y
         if not self.frame.empty and len(self.frame.columns):
             first = self.index(0, 0)
@@ -441,7 +465,7 @@ class FrameModel(QAbstractTableModel):
 class Workbench(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FrMat")
+        self.setWindowTitle("Data Workbench")
         self.resize(1250, 800)
         self.connection = sqlite3.connect(WORKSPACE)
         self.connection.execute("CREATE TABLE IF NOT EXISTS datasets (id INTEGER PRIMARY KEY, name TEXT NOT NULL, source TEXT NOT NULL, imported_at TEXT NOT NULL, original BLOB NOT NULL, current BLOB NOT NULL)")
@@ -465,20 +489,20 @@ class Workbench(QMainWindow):
 
         header = QHBoxLayout()
         heading = QVBoxLayout()
-        title = QLabel("FrMat")
+        title = QLabel("DATA WORKBENCH")
         title.setObjectName("appTitle")
         heading.addWidget(title)
         subtitle = QLabel("Import · clean · explore · export — locally on your PC")
         subtitle.setObjectName("subtitle")
         heading.addWidget(subtitle)
         header.addLayout(heading, 1)
-
-        for label, handler, style in (("Import file", self.import_file, "primaryButton"), ("Export data", self.export_file, "successButton"), ("Reset to import", self.reset_data, "")):
+        for label, handler, style in (("Import file", self.import_file, "primaryButton"),
+                                      ("Export data", self.export_file, "successButton"),
+                                      ("Reset to import", self.reset_data, "")):
             button = QPushButton(label)
             button.setObjectName(style)
             button.clicked.connect(handler)
             header.addWidget(button)
-
         layout.addLayout(header)
 
         def panel(title_text):
@@ -499,7 +523,6 @@ class Workbench(QMainWindow):
         self.datasets.currentIndexChanged.connect(self.load_dataset)
         top.addWidget(self.datasets, 1)
         body.addLayout(top)
-
         quality_row = QHBoxLayout()
         quality_row.addWidget(QLabel("Data quality estimate"))
         self.quality_score = QLabel("N/A")
@@ -507,18 +530,15 @@ class Workbench(QMainWindow):
         quality_row.addWidget(self.quality_score)
         quality_row.addStretch(1)
         body.addLayout(quality_row)
-
         self.quality_bar = QProgressBar()
         self.quality_bar.setRange(0, 100)
         self.quality_bar.setValue(0)
         self.quality_bar.setTextVisible(False)
         body.addWidget(self.quality_bar)
-
         self.quality_details = QLabel("Import data to see completeness, duplicates, outliers, and readability.")
         self.quality_details.setObjectName("guidance")
         self.quality_details.setWordWrap(True)
         body.addWidget(self.quality_details)
-
         layout.addWidget(workspace)
 
         processing, body = panel("FILTER & CLEAN")
@@ -526,34 +546,45 @@ class Workbench(QMainWindow):
         self.prompt = QLineEdit()
         self.prompt.setPlaceholderText("Filter example: [age] >= 18 AND [city] ~ York")
         filters.addWidget(self.prompt, 1)
-
         button = QPushButton("Apply filter")
         button.setObjectName("primaryButton")
         button.clicked.connect(self.filter_data)
         filters.addWidget(button)
         body.addLayout(filters)
-
         presets = QHBoxLayout()
         self.presets = QComboBox()
         self.presets.addItems(["Choose preset", "Remove duplicates", "Drop rows with missing values", "Remove IQR outliers"])
         presets.addWidget(self.presets, 1)
-
         button = QPushButton("Apply preset")
         button.clicked.connect(self.apply_preset)
         presets.addWidget(button)
         body.addLayout(presets)
-
+        sorting = QHBoxLayout()
+        sorting.addWidget(QLabel("Sort by"))
+        self.sort_column = QComboBox()
+        sorting.addWidget(self.sort_column, 1)
+        self.sort_direction = QComboBox()
+        self.sort_direction.addItems(["Ascending", "Descending"])
+        sorting.addWidget(self.sort_direction)
+        sorting.addWidget(QLabel("Then by"))
+        self.sort_second = QComboBox()
+        sorting.addWidget(self.sort_second, 1)
+        self.sort_second_direction = QComboBox()
+        self.sort_second_direction.addItems(["Ascending", "Descending"])
+        sorting.addWidget(self.sort_second_direction)
+        sort_button = QPushButton("Sort rows")
+        sort_button.clicked.connect(self.sort_data)
+        sorting.addWidget(sort_button)
+        body.addLayout(sorting)
         actions = QHBoxLayout()
         undo = QPushButton("Undo last step")
         undo.clicked.connect(self.undo_data)
         actions.addWidget(undo)
-
         history = QPushButton("Processing history")
         history.clicked.connect(self.show_history)
         actions.addWidget(history)
         actions.addStretch(1)
         body.addLayout(actions)
-
         layout.addWidget(processing)
 
         visualization, body = panel("VISUALIZE")
@@ -562,34 +593,29 @@ class Workbench(QMainWindow):
         self.chart_type.addItems(["Histogram", "Bar (count by category)", "Line", "Scatter"])
         self.x_axis = QComboBox()
         self.y_axis = QComboBox()
-
         for label, widget in (("Chart", self.chart_type), ("X / value", self.x_axis), ("Y", self.y_axis)):
             chart.addWidget(QLabel(label))
             chart.addWidget(widget, 1)
-
         self.selected_only = QCheckBox("Selected preview rows only")
         self.selected_only.toggled.connect(self.clear_chart_check)
         chart.addWidget(self.selected_only)
         body.addLayout(chart)
-
         for picker in (self.chart_type, self.x_axis, self.y_axis):
             picker.currentIndexChanged.connect(self.clear_chart_check)
-
         actions = QHBoxLayout()
-        for label, handler, style in (("Check X/Y suitability", self.check_chart_data, ""), ("Draw chart", self.draw_chart, "primaryButton"), ("Save chart PNG", self.save_chart, "")):
+        for label, handler, style in (("Check X/Y suitability", self.check_chart_data, ""),
+                                      ("Draw chart", self.draw_chart, "primaryButton"),
+                                      ("Save chart PNG", self.save_chart, "")):
             button = QPushButton(label)
             button.setObjectName(style)
             button.clicked.connect(handler)
             actions.addWidget(button)
-
         actions.addStretch(1)
         body.addLayout(actions)
-
         self.chart_guidance = QLabel("Choose a chart and axes, then check which rows can be plotted.")
         self.chart_guidance.setObjectName("guidance")
         self.chart_guidance.setWordWrap(True)
         body.addWidget(self.chart_guidance)
-
         layout.addWidget(visualization)
 
         splitter = QSplitter(Qt.Orientation.Vertical)
@@ -600,36 +626,30 @@ class Workbench(QMainWindow):
         self.table.setSelectionMode(QTableView.SelectionMode.ExtendedSelection)
         self.table.selectionModel().selectionChanged.connect(self.clear_chart_check)
         splitter.addWidget(self.table)
-
         self.figure = Figure(figsize=(9, 4), facecolor="#101a2a")
         self.canvas = FigureCanvasQTAgg(self.figure)
         splitter.addWidget(self.canvas)
         splitter.setSizes([460, 230])
         layout.addWidget(splitter, 1)
-
         self.status = QLabel("Import a file to begin. Data stays on this PC.")
         self.status.setObjectName("status")
         layout.addWidget(self.status)
-
         self.progress = QProgressBar()
         self.progress.setRange(0, 0)
         self.progress.hide()
         layout.addWidget(self.progress)
-
         self.cancel_button = QPushButton("Cancel after current step")
         self.cancel_button.clicked.connect(self.cancel_task)
         self.cancel_button.hide()
         layout.addWidget(self.cancel_button)
-
         self.log = QTextEdit()
         self.log.setReadOnly(True)
         self.log.setMaximumHeight(60)
         layout.addWidget(self.log)
-
         self.setCentralWidget(main)
 
     def error(self, exc):
-        QMessageBox.critical(self, "FrMat", str(exc))
+        QMessageBox.critical(self, "Data Workbench", str(exc))
 
     def reload_datasets(self, select_id=None):
         rows = self.connection.execute("SELECT id, name, imported_at FROM datasets ORDER BY id DESC").fetchall()
@@ -662,19 +682,19 @@ class Workbench(QMainWindow):
             self.quality_bar.setValue(0)
             self.quality_details.setText(f"Quality estimate could not be calculated: {exc}")
             return
-
         if result is None:
             self.quality_score.setText("N/A")
             self.quality_bar.setValue(0)
             self.quality_details.setText("No rows to assess; an empty dataset has no quality percentage.")
             return
-
         score = result["score"]
         self.quality_score.setText(f"{score:.0f}%")
         self.quality_bar.setValue(round(score))
-        labels = [f"{name}: {value:.0f}%" if value is not None else f"{name}: N/A" for name, value, _ in result["metrics"]]
+        labels = [f"{name}: {value:.0f}%" if value is not None else f"{name}: N/A"
+                  for name, value, _ in result["metrics"]]
         scope = f"sample of {result['rows']:,} / {result['total']:,} rows" if result["rows"] < result["total"] else f"all {result['total']:,} rows"
-        self.quality_details.setText(f"Based on {scope} · " + "  |  ".join(labels) + ". Higher is better; outliers can be legitimate. This is an estimate, not a validation.")
+        self.quality_details.setText(f"Based on {scope} · " + "  |  ".join(labels) +
+            ". Higher is better; outliers can be legitimate. This is an estimate, not a validation.")
 
     def refresh(self, message):
         self.model.set_frame(self.current)
@@ -694,13 +714,28 @@ class Workbench(QMainWindow):
             self.y_axis.setCurrentText(previous_y)
         self.x_axis.blockSignals(False)
         self.y_axis.blockSignals(False)
+        previous_sort = self.sort_column.currentText()
+        previous_second = self.sort_second.currentText()
+        for picker in (self.sort_column, self.sort_second):
+            picker.blockSignals(True)
+            picker.clear()
+        self.sort_column.addItems(columns)
+        self.sort_second.addItem("(no secondary sort)")
+        self.sort_second.addItems(columns)
+        if previous_sort in columns:
+            self.sort_column.setCurrentText(previous_sort)
+        if previous_second in columns:
+            self.sort_second.setCurrentText(previous_second)
+        for picker in (self.sort_column, self.sort_second):
+            picker.blockSignals(False)
         self.status.setText(f"{message} | {len(self.current):,} rows × {len(columns)} columns | showing first {PREVIEW_ROWS} rows")
         self.log.append(f"{datetime.now():%H:%M:%S}  {message}")
 
     def persist(self, result, message):
         before, after = len(self.current), len(result)
         with self.connection:
-            self.connection.execute("INSERT INTO history (dataset_id, created_at, action, rows_before, rows_after, snapshot) VALUES (?, ?, ?, ?, ?, ?)", (self.dataset_id, datetime.now().isoformat(timespec="seconds"), message, before, after, serialize(self.current)))
+            self.connection.execute("INSERT INTO history (dataset_id, created_at, action, rows_before, rows_after, snapshot) VALUES (?, ?, ?, ?, ?, ?)",
+                                    (self.dataset_id, datetime.now().isoformat(timespec="seconds"), message, before, after, serialize(self.current)))
             self.connection.execute("UPDATE datasets SET current = ? WHERE id = ?", (serialize(result), self.dataset_id))
         self.current = result
         self.refresh(message)
@@ -743,21 +778,17 @@ class Workbench(QMainWindow):
         self.cancel_button.setEnabled(True)
         self.cancel_button.show()
         self.cancel_event = threading.Event()
-        self.task_thread = QThread(self)
-        self.task_worker = TaskWorker(operation, self.cancel_event, discard_result)
-        self.task_worker.moveToThread(self.task_thread)
-        self.task_thread.started.connect(self.task_worker.run)
-        self.task_worker.finished.connect(self.receive_task_result)
-        self.task_worker.finished.connect(self.task_thread.quit)
-        self.task_worker.finished.connect(self.task_worker.deleteLater)
-        self.task_result = (None, "Task ended without result")
-
-        self.task_thread.finished.connect(lambda: self._task_finished(completed))
-        self.task_thread.start()
         self.status.setText(label)
-
-    def _task_finished(self, completed):
-        try:
+        self.task_thread = QThread(self)
+        worker = TaskWorker(operation, self.cancel_event, discard_result)
+        self.task_worker = worker
+        worker.moveToThread(self.task_thread)
+        self.task_thread.started.connect(worker.run)
+        worker.finished.connect(self.receive_task_result)
+        worker.finished.connect(self.task_thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        self.task_result = (None, "Task ended without result")
+        def done():
             self.busy = False
             self.datasets.setEnabled(True)
             self.progress.hide()
@@ -769,14 +800,14 @@ class Workbench(QMainWindow):
             if error:
                 if "cancel" not in str(error).lower():
                     self.error(error)
-                self.status.setText(str(error) if "cancel" in str(error).lower() else f"Failed: {completed.__name__}")
+                self.status.setText(str(error) if "cancel" in str(error).lower() else f"Failed: {label}")
             else:
                 try:
                     completed(result)
                 except Exception as exc:
                     self.error(exc)
-        except Exception as exc:
-            self.error(exc)
+        self.task_thread.finished.connect(done)
+        self.task_thread.start()
 
     def import_file(self):
         if self.busy:
@@ -785,21 +816,20 @@ class Workbench(QMainWindow):
         if not filename:
             return
         path = Path(filename)
-
         def completed(frame):
             if frame is None:
                 return
             frame = unique_columns(frame)
             if not len(frame.columns):
                 raise ValueError("No columns could be extracted from this file")
-            if QMessageBox.question(self, "Import preview", f"{path.name}: {len(frame):,} rows × {len(frame.columns)} columns\n\nSave this import?") != QMessageBox.StandardButton.Yes:
+            preview = frame.head(8).to_string(index=False, max_colwidth=22)
+            if QMessageBox.question(self, "Import preview", f"{path.name}: {len(frame):,} rows × {len(frame.columns)} columns\n\nFirst rows:\n{preview[:3000]}\n\nSave this import?") != QMessageBox.StandardButton.Yes:
                 return
             payload = serialize(frame)
             cursor = self.connection.execute("INSERT INTO datasets (name, source, imported_at, original, current) VALUES (?, ?, ?, ?, ?)", (path.name, filename, datetime.now().isoformat(timespec="seconds"), payload, payload))
             self.connection.commit()
             self.reload_datasets(cursor.lastrowid)
             self.refresh(f"Imported {path.name}")
-
         if path.suffix.lower() in (".xls", ".xlsx", ".db", ".sqlite", ".sqlite3", ".sql"):
             try:
                 completed(read_file(path, self))
@@ -819,18 +849,32 @@ class Workbench(QMainWindow):
 
     def reset_data(self):
         if self.dataset_id is not None and not self.busy:
-            self.current = self.original.copy()
-            self.persist(self.current, "Restored original imported data")
+            self.persist(self.original.copy(), "Restored original imported data")
 
     def filter_data(self):
         if self.dataset_id is None or self.busy:
             return
-        frame = self.current
-
+        frame, expression = self.current, self.prompt.text()
         def completed(result):
-            self.persist(result, f"Filter {self.prompt.text()}; removed {len(frame) - len(result):,} rows")
+            self.persist(result, f"Filter {expression}; removed {len(frame) - len(result):,} rows")
+        self.start_task(lambda: apply_conditions(frame, expression), completed, "Applying filter…")
 
-        self.start_task(lambda: apply_conditions(frame, self.prompt.text()), completed, "Applying filter…")
+    def sort_data(self):
+        if self.dataset_id is None or self.busy or not self.sort_column.currentText():
+            return
+        primary = self.sort_column.currentText()
+        keys = [(primary, self.sort_direction.currentIndex() == 0)]
+        secondary = self.sort_second.currentText()
+        if self.sort_second.currentIndex() > 0:
+            if secondary == primary:
+                self.error(ValueError("Choose different primary and secondary sort columns"))
+                return
+            keys.append((secondary, self.sort_second_direction.currentIndex() == 0))
+        description = ", then ".join(f"{col} {'ascending' if asc else 'descending'}" for col, asc in keys)
+        frame = self.current
+        self.start_task(lambda: sort_frame(frame, keys),
+                        lambda result: self.persist(result, f"Sorted by {description}"),
+                        "Sorting rows…")
 
     def apply_preset(self):
         if self.dataset_id is None or self.busy or self.presets.currentIndex() == 0:
@@ -842,6 +886,7 @@ class Workbench(QMainWindow):
         body.addWidget(QLabel("Choose columns. Duplicate detection compares the selected columns only."))
         columns_list = QListWidget()
         for col in frame.columns:
+            from PySide6.QtWidgets import QListWidgetItem
             item = QListWidgetItem(col)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
             item.setCheckState(Qt.CheckState.Checked if choice != 3 or pd.to_numeric(frame[col], errors="coerce").notna().sum() >= 4 else Qt.CheckState.Unchecked)
@@ -851,25 +896,24 @@ class Workbench(QMainWindow):
         buttons.accepted.connect(picker.accept)
         buttons.rejected.connect(picker.reject)
         body.addWidget(buttons)
-
         if picker.exec() != QDialog.DialogCode.Accepted:
             return
-
         columns = [columns_list.item(i).text() for i in range(columns_list.count()) if columns_list.item(i).checkState() == Qt.CheckState.Checked]
         name = self.presets.currentText()
-
         def preview(pair):
             result, removed = pair
             sample = removed.head(8).to_string(index=False, max_colwidth=24) if not removed.empty else "None"
             text = f"{name} on {', '.join(columns)}\n\nRemove {len(removed):,} of {len(frame):,} rows?\n\nFirst affected rows:\n{sample}"
             if QMessageBox.question(self, "Confirm cleaning", text) == QMessageBox.StandardButton.Yes:
                 self.persist(result, f"{name} [{', '.join(columns)}]; removed {len(removed):,} rows")
-
         self.start_task(lambda: preset_result(frame, choice, columns), preview, "Previewing cleaning…")
 
     def clear_chart_check(self, *_):
-        self.chart_guidance.setText("Chart scope or axes changed; click Check X/Y suitability to update row colors.")
-        self.model.set_eligibility(None, None, None)
+        if hasattr(self, "chart_guidance"):
+            self.chart_guidance.setText("Chart scope or axes changed; click Check X/Y suitability to update row colors.")
+        if hasattr(self, "model") and self.model.eligibility is not None:
+            self.model.set_eligibility(pd.Series(True, index=self.model.frame.index), None, None)
+            self.model.eligibility = None
 
     def chart_source(self):
         if not self.selected_only.isChecked():
@@ -904,37 +948,50 @@ class Workbench(QMainWindow):
         try:
             x, y = self.x_axis.currentText(), self.y_axis.currentText()
             kind = self.chart_type.currentIndex()
+            source, scope = self.chart_source()
+            eligible, _ = chart_eligibility(source, kind, x, y)
+            data = source.loc[eligible]
+            if data.empty:
+                raise ValueError("No selected rows have usable values for this chart and axes")
             self.figure.clear()
             ax = self.figure.add_subplot(111)
+            ax.set_facecolor("#142238")
+            ax.tick_params(colors="#b9cee9")
+            ax.xaxis.label.set_color("#e5effc")
+            ax.yaxis.label.set_color("#e5effc")
+            for spine in ax.spines.values():
+                spine.set_color("#405a79")
+            ax.grid(color="#35506f", alpha=.35, linewidth=.7)
+            ax.set_axisbelow(True)
             if kind == 0:
-                values = pd.to_numeric(self.current[x], errors="coerce").dropna()
-                if values.empty:
-                    raise ValueError("Histogram requires numeric X values")
-                ax.hist(values, bins=30)
+                ax.hist(pd.to_numeric(data[x]), bins=30)
                 ax.set_xlabel(x)
             elif kind == 1:
-                counts = self.current[x].astype("string").fillna("(missing)").value_counts().head(30)
+                counts = data[x].astype("string").fillna("(missing)").value_counts().head(30)
                 counts.plot.bar(ax=ax)
                 ax.set_ylabel("Count (top 30 categories)")
                 ax.set_xlabel(x)
-            else:
-                values = pd.to_numeric(self.current[y], errors="coerce")
-                if not values.notna().any():
-                    raise ValueError("Line and scatter charts require numeric Y values")
-                if kind == 2:
-                    ax.plot(self.current[x].astype(str), values)
-                    if len(self.current) > 30:
-                        ax.xaxis.set_major_locator(__import__("matplotlib").ticker.MaxNLocator(12))
+            elif kind == 2:
+                line_x, line_y, x_kind = ordered_line_points(data, x, y)
+                if x_kind == "date":
+                    ax.plot(line_x, line_y)
+                elif x_kind == "numeric":
+                    ax.plot(line_x.astype(float), line_y)
                 else:
-                    xvalues = pd.to_numeric(self.current[x], errors="coerce")
-                    if not xvalues.notna().any():
-                        raise ValueError("Scatter requires numeric X values")
-                    ax.scatter(xvalues, values, s=12)
+                    ax.plot(range(len(line_x)), line_y)
+                    ticks = list(range(0, len(line_x), max(1, (len(line_x) + 11) // 12)))
+                    ax.set_xticks(ticks, [str(line_x.iloc[i]) for i in ticks], rotation=35, ha="right")
+                if x_kind == "numeric":
+                    ax.xaxis.set_major_locator(__import__("matplotlib").ticker.MaxNLocator(12))
+                ax.set_xlabel(x)
+                ax.set_ylabel(f"{y} (mean per X)")
+            else:
+                ax.scatter(pd.to_numeric(data[x]), pd.to_numeric(data[y]), s=12)
                 ax.set_xlabel(x)
                 ax.set_ylabel(y)
             self.figure.tight_layout()
             self.canvas.draw()
-            self.status.setText("Chart drawn from all current rows. Use Save chart PNG to export it.")
+            self.status.setText(f"Chart drawn: {len(data):,} of {len(source):,} {scope} plotted. Save chart PNG to export it.")
         except Exception as exc:
             self.error(exc)
 
@@ -955,7 +1012,7 @@ class Workbench(QMainWindow):
         path = Path(filename)
         if path.exists() and QMessageBox.question(self, "Replace file?", f"Replace existing file?\n{path}") != QMessageBox.StandardButton.Yes:
             return
-
+        frame = self.current
         def write_export():
             suffix = path.suffix.lower()
             if suffix not in (".csv", ".xlsx", ".json", ".txt", ".xml", ".pdf", ".docx", ".db", ".sql"):
@@ -964,18 +1021,17 @@ class Workbench(QMainWindow):
             os.close(fd)
             target = Path(temporary)
             try:
-                self.write_format(self.current, target, suffix)
+                self.write_format(frame, target, suffix)
+                if self.cancel_event.is_set():
+                    raise ValueError("Export cancelled; existing file was not changed")
                 os.replace(target, path)
             finally:
-                if target.exists():
-                    target.unlink(missing_ok=True)
-            return len(self.current)
-
-        def completed(count):
+                target.unlink(missing_ok=True)
+            return len(frame)
+        def exported(count):
             self.log.append(f"Exported {count:,} rows to {path}")
             self.status.setText(f"Exported {count:,} rows to {path}")
-
-        self.start_task(write_export, completed, "Exporting data…", discard_result=False)
+        self.start_task(write_export, exported, "Exporting data…", discard_result=False)
 
     @staticmethod
     def write_format(frame, path, suffix):
@@ -1036,6 +1092,9 @@ class Workbench(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    theme_path = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent)) / "data_workbench_theme.qss"
+    if theme_path.exists():
+        app.setStyleSheet(theme_path.read_text(encoding="utf-8"))
     window = Workbench()
     window.show()
     sys.exit(app.exec())
