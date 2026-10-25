@@ -1,28 +1,34 @@
-# Windows installation and GitHub packaging
+# FrMat installation and packaging
 
-This folder is a GitHub-ready source repository. It contains the original application, dependency list and README, plus two installation routes. No precompiled Windows `.exe` is included in the ZIP: a Windows binary cannot be produced or tested in this environment.
+This repository contains the source files for FrMat, including the application script, dependency list, and packaging guidance. The project is designed to run locally on Windows without requiring a cloud service.
 
-## Install now from source (Windows)
+## Install from source
 
-1. Install **Python 3.12, 64-bit**, including the Python launcher (`py`); internet access is required to download packages.
-2. Extract this ZIP, open PowerShell in the extracted `DataWorkbench_GitHub` folder, and run:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File .\installer\Install-From-Source.ps1
-   ```
-3. Launch **Data Workbench (Source)** from the Start menu. The script installs the project under `%LOCALAPPDATA%\Programs\DataWorkbench-Source`, without administrator privileges. Keep that directory if you want to use the app. The workspace lives separately in `%LOCALAPPDATA%\DataWorkbench`.
+1. Install Python 3.11 or 3.12 (64-bit) and ensure `py` is available in PATH.
+2. Open PowerShell in the project folder.
+3. Run the installer script:
 
-The script installs Python dependencies rather than creating a self-contained executable. Windows may require additional VC++ runtime components, depending on installed packages.
+```powershell
+powershell -ExecutionPolicy Bypass -File .\installer\Install-From-Source.ps1
+```
+
+This creates a local virtual environment and installs the dependencies required by the application.
 
 ## Build a standalone Windows installer
 
-On a Windows PC with Python 3.12 (64-bit), internet access, and [NSIS](https://nsis.sourceforge.io/) installed, run from the repository root:
+On a Windows PC with Python and NSIS installed, run:
+
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\build_windows.ps1
 ```
-The output is `dist\DataWorkbenchSetup.exe`. It installs per user, creates Start menu shortcuts, registers an uninstaller, and leaves your workspace untouched on uninstall. The executable is unsigned, so Windows SmartScreen may warn; review the source and build it yourself before running it.
 
-## Build through GitHub
+The resulting installer is created in the `dist` folder.
 
-Create a repository, upload the contents of this folder (not the outer ZIP), then use **Actions → Build Windows installer → Run workflow**. Download the `DataWorkbench-Windows-Installer` artifact from the completed run; extract it to get `DataWorkbenchSetup.exe`. A push of a `v*` tag also starts the build. GitHub Actions must be enabled, and the run requires access to PyPI and Chocolatey. This workflow uploads an artifact; it does not automatically publish a GitHub Release.
+## GitHub workflow usage
 
-The compiled installer and its first-run behavior have **not been tested on Windows here**. `.doc` import still requires a separate LibreOffice installation available as `soffice` on PATH. See README.md for supported formats and data-processing limitations.
+The repository is also structured for GitHub-hosted builds or release packaging. Use the existing workflow or build scripts if you want to package the project for distribution.
+
+## Notes
+
+- `.doc` import may require LibreOffice to be installed and available on `PATH` as `soffice`.
+- This repository is intended for local Windows use and packaging workflows rather than server-side deployment.
