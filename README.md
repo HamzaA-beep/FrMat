@@ -1,30 +1,50 @@
 # FrMat
 
-FrMat is a privacy-first local desktop data tool for importing messy files, reviewing them as tables, cleaning the data, generating quick charts, and exporting the final result.
+FrMat is a local desktop data workbench for importing messy files, reviewing them in a table, cleaning and filtering them, generating quick charts, and exporting the final result.
 
-It is designed for small-scale analysis without requiring a cloud backend, external AI service, or account setup. Everything happens locally on the machine where the data lives.
+It runs directly on your desktop machine and is designed for practical local analysis without a cloud backend or remote service.
+
+## Runs on your desktop
+
+FrMat is a desktop-first tool. It is intended to be used on a local Windows workstation, where the data stays on the machine and the app runs from the user’s own environment.
+
+## Minimum hardware requirements
+
+- 64-bit CPU
+- 4 GB RAM minimum
+- 8 GB RAM recommended for smoother performance
+- 1 GB free storage space minimum
+- No dedicated GPU required for normal use
+
+## Minimum software requirements
+
+- Windows 10 or Windows 11 (64-bit)
+- Python 3.11 or 3.12
+- pip access for installing project dependencies
+- Optional: PyInstaller for building a standalone Windows executable
+- Optional: LibreOffice `soffice` on PATH for `.doc` import conversion
 
 ## Why FrMat
 
-FrMat helps with everyday data tasks such as:
+FrMat helps with common local data tasks such as:
 
 - reviewing CSV, Excel, PDF, DOCX, JSON, XML, SQL, and SQLite data
-- filtering rows by condition
-- removing duplicates or incomplete records
+- filtering rows with simple conditions
+- removing duplicate or incomplete records
 - dropping outlier values before analysis
-- drawing simple visual summaries
-- exporting clean results for downstream use
+- drawing quick charts for review
+- exporting cleaned results for downstream use
 
 ## Key features
 
-- Import structured and semi-structured file types
-- View imported data in a tabular interface
-- Apply filters with a plain-language style query format
+- Import and inspect common file formats
+- View data in a table interface
+- Apply filters using a simple expression format
 - Use built-in cleanup presets
 - Remove outlier rows with IQR-based logic
 - Generate histogram, bar, line, and scatter charts
 - Export to CSV, XLSX, JSON, XML, SQLite, DOCX, and PDF
-- Keep all imported and processed data stored locally
+- Keep the workflow local to the desktop environment
 
 ## Example filter syntax
 
@@ -33,12 +53,6 @@ FrMat helps with everyday data tasks such as:
 [city] ~ York
 [status] != null
 ```
-
-## Requirements
-
-- Python 3.11 or 3.12 (64-bit recommended)
-- Windows is the primary supported platform
-- Local access to package installation via `pip`
 
 ## Quick start on Windows
 
@@ -103,19 +117,21 @@ FrMat/
 ## Typical workflow
 
 1. Import a file such as CSV, Excel, PDF, or SQLite.
-2. Review the table and inspect column names.
-3. Apply a filter or cleaning preset.
+2. Review the table and inspect the loaded columns.
+3. Apply a filter or cleanup preset.
 4. Draw a quick chart for visual checks.
-5. Export the cleaned file in the desired format.
+5. Export the cleaned result in the desired format.
 
 ## Limitations
 
 - This is a local desktop utility, not a full production ETL platform.
 - PDF and DOC extraction depends on readable text in the source file.
 - SQL support is limited to SQLite-compatible inputs.
-- Very large or highly complex files should be validated against their source data.
+- Large or highly complex files should be validated against their source data.
 - The app stores imported and processed data locally in a SQLite workspace database.
 
 ## License
 
 This project is licensed under the MIT License. See `LICENSE` for details.
+
+The MIT License is a good choice for a public GitHub project if you want it to be broadly reusable and easy for others to build on. It allows modification, redistribution, and commercial use while requiring attribution and preserving the copyright notice.
