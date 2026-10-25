@@ -27,7 +27,6 @@ from PySide6.QtCore import (
     Signal,
     Slot,
 )
-from PySide6.QtGui import QColor, QIcon
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -355,7 +354,6 @@ def deserialize(blob):
 def apply_conditions(frame, expression):
     if not expression.strip():
         raise ValueError("Enter a condition, such as [age] >= 18 AND [region] = West")
-
     mask = pd.Series(True, index=frame.index)
     for condition in re.split(r"\s+AND\s+", expression.strip(), flags=re.IGNORECASE):
         match = re.fullmatch(r"\s*\[([^]]+)\]\s*(>=|<=|!=|=|>|<|~)\s*(.*?)\s*", condition)
@@ -510,9 +508,6 @@ class Workbench(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("FrMat")
-        icon_path = Path(__file__).resolve().with_name("Fr.ico")
-        if icon_path.exists():
-            self.setWindowIcon(QIcon(str(icon_path)))
         self.resize(1250, 800)
 
         self.connection = sqlite3.connect(WORKSPACE)
@@ -687,6 +682,8 @@ class Workbench(QMainWindow):
         self.table.setSortingEnabled(True)
         self.table.setWordWrap(False)
         self.table.horizontalHeader().setStretchLastSection(True)
+        self.table.horizontalHeader().setSortIndicatorShown(True)
+        self.table.horizontalHeader().setSectionsClickable(True)
         self.table.selectionModel().selectionChanged.connect(self.clear_chart_check)
         splitter.addWidget(self.table)
 
@@ -772,6 +769,7 @@ class Workbench(QMainWindow):
         self.model.set_frame(self.current)
         self.update_quality()
         self.chart_guidance.setText("Choose a chart and axes, then check which rows can be plotted.")
+
         self.x_axis.blockSignals(True)
         self.y_axis.blockSignals(True)
         self.x_axis.clear()
@@ -782,12 +780,13 @@ class Workbench(QMainWindow):
         self.x_axis.blockSignals(False)
         self.y_axis.blockSignals(False)
 
-        self.proxy_model.setSourceModel(self.model)
-        self.proxy_model.sort(0)
         self.proxy_model.invalidate()
         self.table.setSortingEnabled(True)
 
-        self.status.setText(f"{message} | {len(self.current):,} rows × {len(columns)} columns | showing first {PREVIEW_ROWS} rows")
+        self.status.setText(
+            f"{message} | {len(self.current):,} rows × {len(columns)} columns | "
+            f"showing first {PREVIEW_ROWS} rows"
+        )
         self.log.append(f"{datetime.now():%H:%M:%S}  {message}")
 
     def persist(self, result, message):
