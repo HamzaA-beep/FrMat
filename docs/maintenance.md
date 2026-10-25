@@ -1,41 +1,27 @@
-# Maintenance and Upgrades
+# FrMat maintenance
 
-This document covers long-term care for a PC system.
+FrMat is intentionally lightweight, but a few good habits help keep it stable over time.
 
-## Routine maintenance
+## Regular maintenance
 
-- clean dust from fans, filters, and vents
-- check cable routing and fan operation
-- verify temperatures from built-in monitoring tools
-- keep the BIOS and drivers updated
-- scan for malware and unnecessary startup programs
+- keep Python and package versions aligned with the current dependency list
+- clean out old temporary workspace data when needed
+- verify exports against the original source data after major changes
+- keep backups of important datasets before applying transformations
 
-## Upgrade planning
+## Workspace hygiene
 
-Common upgrades include:
+FrMat stores working data in a local SQLite workspace file. It is useful to periodically review the local workspace and remove stale or unnecessary data if disk usage becomes large.
 
-- adding more RAM
-- replacing storage with a larger SSD
-- upgrading the GPU
-- adding better cooling
-- switching to a larger case or improved airflow layout
+## Upgrades
 
-## Safe upgrade practices
+If you update the app or the dependency set:
 
-1. Back up important files before major changes.
-2. Use proper anti-static handling.
-3. Verify compatibility before purchase.
-4. Update BIOS or drivers only when necessary.
-5. Re-test performance after changes.
-
-## Long-term performance tips
-
-- keep the case dust-free
-- reduce unnecessary background software
-- monitor temperatures after each upgrade
-- maintain clean airflow paths
-- document build changes and component versions
+1. back up your data files
+2. recreate the virtual environment if needed
+3. reinstall dependencies via `requirements.txt`
+4. test import, filter, and export flows again
 
 ## Summary
 
-A well-maintained PC lasts longer and performs more reliably. Small, scheduled checks prevent many larger issues over time.
+Because FrMat is local-first, maintenance is mostly about keeping the environment clean, the dependencies valid, and the underlying data safe.

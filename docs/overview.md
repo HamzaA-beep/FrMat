@@ -1,61 +1,52 @@
-# PC System Overview
+# FrMat overview
 
-This project documents a complete personal computer setup and installation process.
+FrMat is a local desktop data workbench made for quick, user-controlled analysis.
 
-## Purpose
+## What it does
 
-The purpose of this repository is to provide a practical, public reference for:
+The application allows users to:
 
-- understanding what components make up a PC
-- choosing compatible hardware
-- assembling a computer safely
-- installing a working operating system
-- performing maintenance and upgrades
+- open common data files
+- inspect the dataset in a table
+- filter rows using a straightforward condition language
+- clean duplicate or incomplete records
+- draw basic charts
+- export the processed output to a chosen format
 
-## Typical PC layout
+## Use cases
 
-A basic desktop PC usually includes:
+FrMat is useful for:
 
-- CPU: the central computing processor
-- motherboard: the main logic board
-- RAM: active memory for current tasks
-- storage: SSD or NVMe for system and files
-- GPU: graphics processing unit for visuals and acceleration
-- PSU: power supply unit
-- cooling: air or liquid cooling
-- case: enclosure and airflow management
-- peripherals: keyboard, mouse, monitor, audio
+- data cleanup before reporting
+- reviewing messy spreadsheets
+- exploratory analysis on local files
+- quick charting without a more complex BI stack
+- data work that should remain on-device
 
-## Build goals
+## Design goals
 
-The ideal setup depends on the workload. Common categories include:
+The tool is intended to be:
 
-- gaming build
-- office / productivity build
-- creator workstation
-- home media or streaming PC
-- lightweight budget system
+- simple to run locally
+- easy to understand
+- usable without cloud infrastructure
+- suitable for private or office work on local machine data
 
-## Design principles
+## Principles
 
-A good PC build should prioritize:
+- keep the workflow simple
+- use standard file formats
+- avoid lock-in to any single vendor or service
+- keep sensitive data local by default
 
-- hardware compatibility
-- thermal efficiency
-- stable power delivery
-- future upgrade support
-- quiet and clean cable management
+## Typical workflow
 
-## Example system
+1. Import data
+2. Inspect the loaded table
+3. Apply filters or cleanup presets
+4. Review the updated dataset
+5. Export the final result
 
-A balanced mid-range PC may include:
+## Summary
 
-- AMD Ryzen 5 or Intel Core i5 CPU
-- B-series or X-series motherboard
-- 16GB DDR4/DDR5 memory
-- 1TB NVMe SSD
-- NVIDIA or AMD GPU depending on use case
-- 650W or 750W power supply
-- mid-tower case with airflow
-
-This repository focuses on practical installation and documentation rather than a specific brand or vendor lock-in.
+FrMat is a lightweight local data analysis tool that focuses on clarity, privacy, and straightforward file-based workflows.

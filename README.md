@@ -1,19 +1,30 @@
 # FrMat
 
-FrMat is a local desktop application for importing data, reviewing it as a table, applying simple filters and cleanup steps, generating charts, and exporting the results.
+FrMat is a privacy-first local desktop data tool for importing messy files, reviewing them as tables, cleaning the data, generating quick charts, and exporting the final result.
 
-This project is a lightweight data analysis tool that keeps all work on the user’s machine and does not require any cloud service or external AI backend.
+It is designed for small-scale analysis without requiring a cloud backend, external AI service, or account setup. Everything happens locally on the machine where the data lives.
 
-## Features
+## Why FrMat
 
-- Import data from CSV, Excel, TXT, PDF, DOC/DOCX, JSON, XML, SQL, and SQLite files
-- Review imported data in a table interface
-- Apply row filters with a simple expression language
-- Use built-in cleanup presets such as deduplication and missing-value removal
-- Remove outlier rows based on IQR logic
-- Draw basic charts from numeric and categorical data
-- Export processed data to CSV, Excel, JSON, XML, SQLite, DOCX, or PDF formats
-- Keep imported and processed data local to the machine
+FrMat helps with everyday data tasks such as:
+
+- reviewing CSV, Excel, PDF, DOCX, JSON, XML, SQL, and SQLite data
+- filtering rows by condition
+- removing duplicates or incomplete records
+- dropping outlier values before analysis
+- drawing simple visual summaries
+- exporting clean results for downstream use
+
+## Key features
+
+- Import structured and semi-structured file types
+- View imported data in a tabular interface
+- Apply filters with a plain-language style query format
+- Use built-in cleanup presets
+- Remove outlier rows with IQR-based logic
+- Generate histogram, bar, line, and scatter charts
+- Export to CSV, XLSX, JSON, XML, SQLite, DOCX, and PDF
+- Keep all imported and processed data stored locally
 
 ## Example filter syntax
 
@@ -23,17 +34,15 @@ This project is a lightweight data analysis tool that keeps all work on the user
 [status] != null
 ```
 
-The filter format uses bracketed column names and operators such as `=`, `!=`, `>`, `>=`, `<`, `<=`, and `~`.
-
 ## Requirements
 
 - Python 3.11 or 3.12 (64-bit recommended)
-- Windows is the primary target for this project
+- Windows is the primary supported platform
 - Local access to package installation via `pip`
 
 ## Quick start on Windows
 
-From a PowerShell terminal in the project folder:
+From PowerShell in the project folder:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -44,7 +53,7 @@ python data_workbench.py
 
 If Python 3.11 is installed instead, replace `-3.12` with `-3.11`.
 
-## Optional Windows build
+## Optional standalone build
 
 To build a one-file Windows executable with PyInstaller:
 
@@ -53,7 +62,21 @@ py -3.12 -m pip install --upgrade pip pyinstaller
 pyinstaller --noconfirm --onefile --windowed --name FrMat --collect-all matplotlib --collect-all pandas data_workbench.py
 ```
 
-The build output is placed in the `dist` folder.
+The output is created in the `dist` folder.
+
+## Supported formats
+
+| Format | Import | Export |
+| --- | --- | --- |
+| CSV | Yes | Yes |
+| XLS / XLSX | Yes | Yes |
+| TXT | Yes | Yes |
+| PDF | Yes | Yes |
+| DOC / DOCX | Yes | Yes |
+| JSON | Yes | Yes |
+| XML | Yes | Yes |
+| SQL / SQLite | Yes | Yes |
+| PNG chart | No | Yes |
 
 ## Project structure
 
@@ -68,42 +91,30 @@ FrMat/
 │   └── Install-From-Source.ps1
 ├── scripts/
 │   └── build_windows.ps1
+├── docs/
+│   ├── overview.md
+│   ├── components.md
+│   ├── installation-guide.md
+│   ├── maintenance.md
+│   └── troubleshooting.md
 └── .gitignore
 ```
 
 ## Typical workflow
 
 1. Import a file such as CSV, Excel, PDF, or SQLite.
-2. Review the table and check the loaded columns.
-3. Apply a filter or preset to clean the dataset.
-4. Draw a chart for quick visual checks.
-5. Export the cleaned result in the desired format.
-
-## Supported import/export formats
-
-| Type | Import | Export |
-| --- | --- | --- |
-| CSV | Yes | Yes |
-| XLS / XLSX | Yes | Yes |
-| TXT | Yes | Yes |
-| PDF | Yes | Yes |
-| DOC / DOCX | Yes | Yes |
-| JSON | Yes | Yes |
-| XML | Yes | Yes |
-| SQL / SQLite | Yes | Yes |
-| Chart PNG | No | Yes |
+2. Review the table and inspect column names.
+3. Apply a filter or cleaning preset.
+4. Draw a quick chart for visual checks.
+5. Export the cleaned file in the desired format.
 
 ## Limitations
 
-- The application is a local desktop tool and not a production ETL platform.
-- PDF and DOC text extraction depends on the source file being text-based and readable.
+- This is a local desktop utility, not a full production ETL platform.
+- PDF and DOC extraction depends on readable text in the source file.
 - SQL support is limited to SQLite-compatible inputs.
-- Large or very complex files may require validation against the source data.
+- Very large or highly complex files should be validated against their source data.
 - The app stores imported and processed data locally in a SQLite workspace database.
-
-## Notes
-
-FrMat is intended as a practical local data review and cleanup project. It may be used as a base for further enhancements such as expanded file support, more advanced analysis tools, or improved packaging and distribution.
 
 ## License
 

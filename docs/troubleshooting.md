@@ -1,94 +1,66 @@
-# Troubleshooting
+# FrMat troubleshooting
 
-This document covers common PC installation and startup issues.
+This page covers the most common issues users may encounter when running FrMat locally.
 
-## No display after assembly
+## App does not start
 
-Possible causes:
+Check the following:
 
-- RAM not fully seated
-- GPU not installed correctly
-- CPU cooling not connected or installed incorrectly
-- monitor connected to the wrong port
-- power cables not fully attached
+- Python is installed and available on PATH
+- the environment is activated
+- `requirements.txt` has been installed successfully
+- the current project directory contains `data_workbench.py`
 
-Recommended checks:
+## Missing dependency errors
 
-- reseat RAM and GPU
-- verify monitor cable and input source
-- confirm all power connectors are connected
-- inspect CPU fan and cooler mounting
+Reinstall the dependencies:
 
-## System won’t power on
+```powershell
+python -m pip install -r requirements.txt
+```
 
-Possible causes:
+If a package fails to load, verify the Python version matches the supported range.
 
-- PSU switch off or disconnected
-- front-panel power switch not connected
-- motherboard power connector missing
-- short from loose screw or cable
+## Import fails for a file type
 
-Recommended checks:
+Common causes include:
 
-- verify 24-pin and 8-pin power connections
-- ensure the motherboard is not shorting against the case
-- confirm the case power button is connected correctly
+- unsupported extension
+- unreadable or corrupted file
+- missing tool such as LibreOffice for `.doc` conversion
+- insufficient file permissions
 
-## High temperature warnings
+## Filter produces no rows
 
-Possible causes:
+Check the syntax carefully. FrMat expects expressions in the form:
 
-- poor airflow
-- incorrect cooler mounting
-- thermal paste missing or applied poorly
-- dust buildup
+```text
+[column] operator value
+```
 
-Recommended checks:
+For example:
 
-- re-check cooler placement
-- ensure fans are mounted in the correct orientation
-- clean dust filters and fan blades
-- monitor temperatures with sensors or software
+```text
+[age] >= 18
+[status] != null
+```
 
-## Boot loop or restart during startup
+## Chart does not render
 
-Possible causes:
+This usually happens when:
 
-- unstable memory configuration
-- failing storage device
-- overclocking without proper support
-- insufficient power for the system
+- the selected column contains non-numeric data for numeric charting
+- the dataset is empty
+- the chart type doesn’t match the selected columns
 
-Recommended checks:
+## Export fails
 
-- clear BIOS settings to defaults
-- reseat memory and storage cables
-- remove overclock settings
-- check PSU rating and wattage
+Verify:
 
-## Drivers or OS installation problems
-
-Possible causes:
-
-- incorrect boot media
-- damaged USB stick
-- missing chipset drivers at the correct stage
-
-Recommended checks:
-
-- recreate the bootable installer
-- verify USB is properly formatted
-- use BIOS to select the correct boot device
-
-## Diagnostic mindset
-
-When a problem appears:
-
-1. confirm power and connections
-2. isolate whether it is RAM, GPU, storage, or cooling-related
-3. simplify to a bare minimum configuration when needed
-4. verify BIOS settings before assuming hardware failure
+- the output path is writable
+- the filename extension matches the export format
+- the data is not too wide for the chosen PDF output
 
 ## Summary
 
-Most PC issues are caused by a small number of common mistakes: mis-seated components, missing power, overheating, or poor BIOS settings. Systematic checks usually solve them quickly.
+Most FrMat issues are caused by dependency problems, incorrect file formats, or invalid filter expressions. Checking the file type and Python environment usually resolves the majority of problems quickly.

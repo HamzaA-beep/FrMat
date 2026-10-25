@@ -1,90 +1,73 @@
-# PC Components
+# FrMat components and workflow
 
-This document explains the main parts that make up a personal computer and why they matter.
+FrMat is made up of a few essential parts that work together to create a local data review and cleanup workflow.
 
-## Core components
+## Main components
 
-### CPU
-The processor handles computation and instruction execution.
+### File import layer
+This is the entry point for loading data files.
 
-- Affects performance in productivity, gaming, and rendering tasks
-- Should match the motherboard socket and cooling solution
-- Important factors: core count, thread count, clock speed, power draw
+Supported types include:
 
-### Motherboard
-The motherboard connects all major components.
+- CSV
+- XLS / XLSX
+- TXT
+- JSON
+- XML
+- PDF
+- DOC / DOCX
+- SQL / SQLite
 
-- Determines socket compatibility
-- Controls memory support and expansion slots
-- Includes storage connectivity, USB, network, and audio
+### Table view
+The imported data is displayed in a table so the user can inspect columns, values, and row counts before applying transformations.
 
-### Memory (RAM)
-RAM stores data the system uses actively.
+### Filter engine
+The filter system uses a column-based syntax such as:
 
-- Recommended minimum for modern systems: 16GB
-- More memory helps multitasking and heavier workloads
-- Speed and capacity must be supported by the motherboard
+```text
+[age] >= 18 AND [region] = West
+[city] ~ York
+[status] != null
+```
 
-### Storage
-Storage holds the operating system and files.
+This helps users narrow the dataset without learning a full query language.
 
-- NVMe SSDs offer faster load times and responsiveness
-- SATA SSDs are more affordable but slower
-- HDDs are cost-effective for large-capacity storage
+### Cleanup presets
+FrMat includes simple operations such as:
 
-### Graphics card (GPU)
-The GPU handles visual rendering and graphics acceleration.
+- removing duplicate rows
+- dropping rows with missing values
+- removing IQR-based outliers
 
-- Essential for gaming, 3D work, video editing, and AI tasks
-- Some CPUs include integrated graphics, but dedicated GPUs provide higher performance
+### Chart generation
+Users can quickly produce basic charts such as:
 
-### Power supply (PSU)
-The PSU provides stable power to all internal components.
+- histogram
+- bar chart
+- line chart
+- scatter plot
 
-- Should be reputable and appropriately rated
-- Higher-quality units improve system stability and safety
-- A power budget should account for peak total system usage
+### Export layer
+Processed datasets can be saved in formats such as:
 
-### Cooling
-Cooling prevents the system from overheating.
+- CSV
+- XLSX
+- JSON
+- XML
+- SQLite database
+- DOCX
+- PDF
 
-- Air cooling is common and easy to maintain
-- Liquid cooling supports high-performance systems
-- Good airflow and case design matter as much as the cooler itself
+## Why these pieces matter
 
-### Case
-The case houses the hardware and affects airflow and cable management.
+Each part of FrMat is built to support a simple local-analysis pipeline:
 
-- Choose a case size that supports the motherboard and GPU
-- Plan for airflow path and dust control
-- Front and rear fan placement matters for thermal performance
-
-### Operating system
-The OS creates the environment for applications and system control.
-
-- Windows is common for gaming and general use
-- Linux is popular for development and open-source workflows
-- macOS is limited to Apple hardware
-
-## Compatibility checklist
-
-Before buying components, confirm:
-
-- CPU socket matches the motherboard
-- RAM type matches the motherboard and CPU platform
-- PSU wattage covers the system load
-- GPU fits the case size
-- Cooling supports CPU height and motherboard layout
-
-## Recommended upgrade path
-
-A common evolution path is:
-
-- start with a stable base build
-- upgrade GPU later if needed
-- add storage for media or games
-- increase RAM when workloads expand
+1. import data
+2. inspect and filter it
+3. clean it
+4. visualize patterns
+5. export the output
 
 ## Summary
 
-Each component contributes to one overall system goal: reliable, fast, and stable performance. Choosing compatible parts is more important than chasing the highest single-spec component.
+FrMat combines import, cleaning, filtering, visualization, and export in a single local tool so the user can work without a larger platform.
