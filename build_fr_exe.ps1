@@ -1,5 +1,4 @@
-# Place this script, data_workbench.py, requirements.txt, and
-# data_workbench_theme.qss in the same directory.
+# Place this script and FrMat.py in the same directory.
 # Run with PowerShell on Windows.
 
 $ErrorActionPreference = 'Stop'
@@ -21,8 +20,7 @@ if ($LASTEXITCODE -ne 0) {
 
 & $pythonCmd -m PyInstaller --noconfirm --clean --onefile --windowed `
     --name FrMat `
-    --add-data "data_workbench_theme.qss;." `
-    "data_workbench.py"
+    "FrMat.py"
 
 if ($LASTEXITCODE -ne 0) {
     throw "EXE build failed."
