@@ -816,5 +816,5 @@ class Workbench(QMainWindow):
         with self.connection:
             self.connection.execute("UPDATE datasets SET current = ? WHERE id = ?", (row[2], self.dataset_id))
             self.connection.execute("DELETE FROM history WHERE id = ?", (row[0],))
-        self.current = restored***
-
+        self.current = restored
+        self.refresh("Undid last step")
