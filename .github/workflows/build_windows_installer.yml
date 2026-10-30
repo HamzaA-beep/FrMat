@@ -43,7 +43,7 @@ jobs:
             --collect-all reportlab `
             --collect-all defusedxml `
             --collect-all docx `
-            data_workbench.py
+            FrMat.py
 
       - name: Package built executable
         shell: powershell
